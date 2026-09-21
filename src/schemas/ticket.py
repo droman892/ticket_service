@@ -1,11 +1,17 @@
 from datetime import datetime
 from decimal import Decimal
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from ..models import Priority, Status
 
 TICKET_ID_PATTERN = r"^[0-9]{9}$"
+
+SortField = Literal[
+    "ticket_id", "customer", "priority", "status", "hours", "assigned_agent_id", "created_at", "updated_at"
+]
+SortOrder = Literal["asc", "desc"]
 
 
 def _validate_half_hour_step(value: Decimal | None) -> Decimal | None:
@@ -74,3 +80,16 @@ class TicketResponse(BaseModel):
     assigned_agent_id: int | None
     created_at: datetime
     updated_at: datetime
+
+
+class TicketPage(BaseModel):
+    items: list[TicketResponse]
+    total: int
+    page: int
+    page_size: int
+
+
+class TicketSummary(BaseModel):
+    by_status: dict[str, int]
+    by_priority: dict[str, int]
+    by_customer: dict[str, int]
