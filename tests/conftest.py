@@ -4,9 +4,12 @@ import pytest
 import pytest_asyncio
 from alembic import command
 from alembic.config import Config
+from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 
 from src.config import get_settings
+from src.db import get_session
+from src.main import app
 
 
 def _alembic_config(database_url: str) -> Config:
@@ -48,3 +51,27 @@ async def db_session() -> AsyncIterator[AsyncSession]:
             await session.close()
             await transaction.rollback()
     await engine.dispose()
+
+
+@pytest_asyncio.fixture
+async def client(db_session: AsyncSession) -> AsyncIterator[AsyncClient]:
+    """An HTTP client for the app, sharing db_session's transaction — so a
+    row a test creates directly via the ORM is visible to the request, and
+    a row a request creates is visible back in the test, all rolled back
+    together.
+
+    Uses httpx.AsyncClient over Starlette's TestClient deliberately:
+    TestClient can run the ASGI app in a different event loop than the
+    test itself, which breaks an asyncpg connection (bound to the loop
+    that created it). AsyncClient with ASGITransport runs everything in
+    this test's own event loop.
+    """
+
+    async def override_get_session() -> AsyncIterator[AsyncSession]:
+        yield db_session
+
+    app.dependency_overrides[get_session] = override_get_session
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        yield ac
+    app.dependency_overrides.pop(get_session, None)
