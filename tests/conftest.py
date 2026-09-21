@@ -46,7 +46,15 @@ async def db_session() -> AsyncIterator[AsyncSession]:
     engine = create_async_engine(settings.test_database_url)
     async with engine.connect() as connection:
         transaction = await connection.begin()
-        session = AsyncSession(bind=connection, join_transaction_mode="create_savepoint")
+        # expire_on_commit=False matches src/db.py's real session factory:
+        # without it, a service-layer commit() (create_ticket, create_user,
+        # ...) would expire every other object already loaded in this same
+        # shared test session — e.g. a helper-created `agent` — and a plain
+        # attribute access on one afterward would try an implicit lazy-load
+        # outside the async context and crash with MissingGreenlet.
+        session = AsyncSession(
+            bind=connection, join_transaction_mode="create_savepoint", expire_on_commit=False
+        )
         try:
             yield session
         finally:

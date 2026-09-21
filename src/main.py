@@ -1,8 +1,10 @@
 from fastapi import FastAPI
 
 from .api.auth import router as auth_router
+from .api.tickets import router as tickets_router
 from .api.users import router as users_router
 
 app = FastAPI(title="Ticket Service")
 app.include_router(auth_router)
 app.include_router(users_router)
+app.include_router(tickets_router)
