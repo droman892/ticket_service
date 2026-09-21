@@ -1,4 +1,4 @@
-from collections.abc import AsyncIterator
+from collections.abc import Awaitable, Callable, AsyncIterator
 
 import pytest
 import pytest_asyncio
@@ -8,8 +8,10 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 
 from src.config import get_settings
+from src.core.security import create_access_token, hash_password
 from src.db import get_session
 from src.main import app
+from src.models import Role, User
 
 
 def _alembic_config(database_url: str) -> Config:
@@ -75,3 +77,34 @@ async def client(db_session: AsyncSession) -> AsyncIterator[AsyncClient]:
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         yield ac
     app.dependency_overrides.pop(get_session, None)
+
+
+@pytest.fixture
+def make_user(db_session: AsyncSession) -> Callable[..., Awaitable[User]]:
+    """Factory fixture: await make_user(username=..., role=..., ...) as many
+    times as a test needs, each call flushed (visible to the same test's
+    requests via the client fixture) but rolled back at teardown like
+    everything else in db_session."""
+
+    async def _make_user(
+        *,
+        username: str = "user",
+        password: str = "password123",
+        role: Role = Role.AGENT,
+        is_active: bool = True,
+    ) -> User:
+        user = User(username=username, password_hash=hash_password(password), role=role, is_active=is_active)
+        db_session.add(user)
+        await db_session.flush()
+        return user
+
+    return _make_user
+
+
+@pytest.fixture
+def auth_headers() -> Callable[[User], dict[str, str]]:
+    def _headers(user: User) -> dict[str, str]:
+        token = create_access_token(user_id=user.id, role=user.role.value, settings=get_settings())
+        return {"Authorization": f"Bearer {token}"}
+
+    return _headers

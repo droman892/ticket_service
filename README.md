@@ -2,7 +2,7 @@
 
 An authenticated backend API for managing support tickets: agents and admins log in, view and update tickets, bulk-import them from CSV, and pull status/priority/customer summaries. Built as the backend counterpart to [csv_extractor](../csv_extractor) — same ticket fields and validation rules, now served over HTTP with real users, roles, and a database instead of local file processing.
 
-**Status: early development.** The data model, database migrations, and authentication (login, JWT bearer tokens, role-based access control) are in place and tested. Ticket, user-management, import, and summary endpoints from `docs/requirements.md` are not implemented yet.
+**Status: early development.** The data model, database migrations, authentication, and admin-only user management are in place and tested. Ticket, import, and summary endpoints from `docs/requirements.md` are not implemented yet.
 
 ## Problem
 
@@ -20,7 +20,7 @@ Full detail on what each role can and can't do is in `docs/requirements.md`.
 
 See `docs/requirements.md` for the full, locked specification. At a high level: authenticated login, ticket CRUD with an enforced lifecycle (a closed ticket is permanently immutable), per-agent ownership rules, filtered/paginated/sorted ticket listing, status/priority/customer summaries, and admin-only CSV bulk import with a per-row validation report.
 
-**Implemented so far:** `POST /auth/login` (bearer token, 60-minute TTL), password hashing, and the `get_current_user`/`require_role` dependencies every other endpoint will build on.
+**Implemented so far:** `POST /auth/login` (bearer token, 60-minute TTL), password hashing, and the `get_current_user`/`require_role` dependencies every other endpoint builds on; admin-only `POST /users` and `PATCH /users/{id}` (no delete endpoint — accounts are deactivated, never removed).
 
 ## Architecture
 
