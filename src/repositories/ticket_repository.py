@@ -24,6 +24,15 @@ async def get_by_id(session: AsyncSession, ticket_id: int) -> Ticket | None:
     return await session.get(Ticket, ticket_id)
 
 
+async def get_existing_ticket_ids(session: AsyncSession, ticket_ids: list[str]) -> set[str]:
+    """One query for however many ids a whole CSV import needs checked,
+    instead of one query per row — matters for the 10,000-row NFR."""
+    if not ticket_ids:
+        return set()
+    result = await session.execute(select(Ticket.ticket_id).where(Ticket.ticket_id.in_(ticket_ids)))
+    return set(result.scalars().all())
+
+
 async def list_tickets(
     session: AsyncSession,
     *,

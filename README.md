@@ -2,7 +2,7 @@
 
 An authenticated backend API for managing support tickets: agents and admins log in, view and update tickets, bulk-import them from CSV, and pull status/priority/customer summaries. Built as the backend counterpart to [csv_extractor](../csv_extractor) — same ticket fields and validation rules, now served over HTTP with real users, roles, and a database instead of local file processing.
 
-**Status: early development.** Data model, migrations, authentication, user management, ticket CRUD with its lifecycle rule, and listing/filtering/pagination/summary are in place and tested. CSV import from `docs/requirements.md` is not implemented yet.
+**Status: early development.** Every endpoint in `docs/requirements.md` is implemented and tested except the health check. Still ahead: observability/hardening, a documented security review, and the full README/ADR pass.
 
 ## Problem
 
@@ -20,7 +20,7 @@ Full detail on what each role can and can't do is in `docs/requirements.md`.
 
 See `docs/requirements.md` for the full, locked specification. At a high level: authenticated login, ticket CRUD with an enforced lifecycle (a closed ticket is permanently immutable), per-agent ownership rules, filtered/paginated/sorted ticket listing, status/priority/customer summaries, and admin-only CSV bulk import with a per-row validation report.
 
-**Implemented so far:** `POST /auth/login` (bearer token, 60-minute TTL), password hashing, and the `get_current_user`/`require_role` dependencies every other endpoint builds on; admin-only `POST /users` and `PATCH /users/{id}` (no delete endpoint — accounts are deactivated, never removed); `POST /tickets`, `GET /tickets/{id}`, `PATCH /tickets/{id}` with ownership rules (an agent edits only their own assigned tickets and can never reassign one) and the closed-ticket-is-fully-immutable lifecycle rule; `GET /tickets` (filter/sort on every column but `id`, default page size 30, max 100) and `GET /tickets/summary` (counts by status/priority/customer).
+**Implemented so far:** `POST /auth/login` (bearer token, 60-minute TTL), password hashing, and the `get_current_user`/`require_role` dependencies every other endpoint builds on; admin-only `POST /users` and `PATCH /users/{id}` (no delete endpoint — accounts are deactivated, never removed); `POST /tickets`, `GET /tickets/{id}`, `PATCH /tickets/{id}` with ownership rules (an agent edits only their own assigned tickets and can never reassign one) and the closed-ticket-is-fully-immutable lifecycle rule; `GET /tickets` (filter/sort on every column but `id`, default page size 30, max 100) and `GET /tickets/summary` (counts by status/priority/customer); admin-only `POST /tickets/import` (CSV, 5 MB cap, reuses the same validation as `POST /tickets` row by row, reports every skipped row with a reason rather than failing the whole file).
 
 ## Architecture
 

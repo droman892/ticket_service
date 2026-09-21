@@ -1,6 +1,6 @@
 from decimal import Decimal
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db import get_session
@@ -15,11 +15,15 @@ from ..schemas.ticket import (
     TicketSummary,
     TicketUpdate,
 )
+from ..schemas.ticket_import import ImportResult
+from ..services.ticket_import_service import MalformedCsvError, import_tickets_csv
 from ..services.ticket_lifecycle import TicketNotEditableError
 from ..services.ticket_service import DuplicateTicketIdError, InvalidAssignedAgentError, create_ticket, update_ticket
-from .deps import get_current_user
+from .deps import get_current_user, require_role
 
 router = APIRouter(prefix="/tickets", tags=["tickets"])
+
+MAX_IMPORT_FILE_SIZE = 5 * 1024 * 1024  # 5 MB (requirements.md FR13)
 
 
 @router.post("", response_model=TicketResponse, status_code=status.HTTP_201_CREATED)
@@ -43,7 +47,26 @@ async def create(
     except DuplicateTicketIdError:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="ticket_id already exists")
     except InvalidAssignedAgentError as exc:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc))
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc))
+
+
+@router.post("/import", response_model=ImportResult)
+async def import_csv(
+    file: UploadFile = File(...),
+    current_user: User = Depends(require_role(Role.ADMIN)),
+    session: AsyncSession = Depends(get_session),
+) -> ImportResult:
+    content = await file.read()
+    if len(content) > MAX_IMPORT_FILE_SIZE:
+        raise HTTPException(
+            status_code=status.HTTP_413_CONTENT_TOO_LARGE,
+            detail="File exceeds the 5 MB limit",
+        )
+
+    try:
+        return await import_tickets_csv(session, content)
+    except MalformedCsvError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc))
 
 
 @router.get("/summary", response_model=TicketSummary)
@@ -131,4 +154,4 @@ async def update(
             detail="Ticket is closed and cannot be edited",
         )
     except InvalidAssignedAgentError as exc:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc))
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc))
