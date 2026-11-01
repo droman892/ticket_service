@@ -78,7 +78,7 @@ Full detail will live in `docs/security.md` once there's an API surface to revie
 
 ## Limitations
 
-Pre-implementation. No frontend, no AI/LLM features, no cloud deployment — see `docs/requirements.md` §6 for the full, explicit non-goals list.
+No frontend and no cloud deployment. See `docs/requirements.md` §6 for the full list of non-goals.
 
 ## Lessons learned
 
